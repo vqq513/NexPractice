@@ -1,0 +1,922 @@
+# Player match statistics persistence. This controls wins/losses/kills/deaths and the per-kit rank derived from wins.
+# Other plugin data (coins, cosmetics, kit profiles, arena definitions, and player preferences) stays in its existing YAML file.
+# First switch from server to MySQL/MongoDB automatically imports leaderboards.yml only when the selected database is empty.
+storage:
+  # server = local leaderboards.yml; mysql = MySQL/MariaDB; mongodb = MongoDB.
+  backend: server
+  mysql:
+    host: '127.0.0.1'
+    port: 3306
+    database: vprac
+    username: vprac
+    password: 'change-me'
+    use-ssl: false
+    table-prefix: 'vprac_'
+  mongodb:
+    # URI can include authentication, replica set, and TLS options; protect this file if it contains credentials.
+    uri: 'mongodb://127.0.0.1:27017'
+    database: vprac
+    collection: player_stats
+
+# Time shown in the first line of the lobby scoreboard. Use e.g. GMT+03:00, GMT+04:00 or GMT+05:00.
+lobby-clock:
+  timezone: 'GMT+03:00'
+  # Java DateTimeFormatter pattern. Default renders as Oct 22, 21:16 (no GMT suffix).
+  format: 'MMM dd, HH:mm'
+
+# Optional FancyHolograms-backed per-kit leaderboards. Install FancyHolograms to enable /vhg.
+# Each leaderboard is one multi-line text hologram. FancyHolograms CENTER billboarding makes the
+# complete text face each viewer client-side; NexPractice does not rotate/move display parts on player movement.
+# Left/right-click anywhere on the display opens a period picker because FancyHolograms text itself
+# currently has no native click actions. This is one fixed interaction hitbox per board, not per-line targets.
+# DAILY rolls over at 00:00 in this timezone, WEEKLY follows ISO weeks (Monday start), MONTHLY at month start.
+leaderboards:
+  holograms:
+    enabled: true
+    timezone: 'GMT+03:00'
+    # Number of minutes before the hologram advances to the next kit. This also drives the displayed countdown.
+    cycle-interval-minutes: 10
+    # Size of the one stationary hitbox used to open the period picker. This is not the display itself.
+    click-width: 6.0
+    click-height: 4.5
+    text-scale: 0.7
+    selected-label-format: '&e&l[{label}]'
+    label-format: '&a[{label}]'
+    separator: '&7-'
+    title-format: '&b&l{metric} Leaderboards'
+    kit-format: '&e&l{kit}'
+    player-row-format: '&6#{place} &7- &f{player} &7- &6{value}'
+    empty-row-format: '&7#{place} &7- &8No player'
+    timer-format: '&fNext update in {time}'
+
+# Respawn behavior. This is a Minecraft world gamerule; when enabled it removes the vanilla
+# death screen for ALL players in each loaded world, not only NexPractice match participants.
+respawn:
+  immediate-respawn: true
+
+# NexPractice queue item settings.
+# The first hotbar slot is inventory slot 0.
+queue-item-slot: 0
+queue-item-name: '&bQueues&8(&7Right Click&8)'
+queue-item-attack-speed: 20.0
+
+# Settings for special NexPractice items. Golden Head is a custom-textured PLAYER_HEAD.
+# Special fireballs break at most a 3-wide by 2-high panel on the impact plane. When a kit
+# has Destroy / Break blocks disabled, fireballs may remove only blocks placed during that match.
+# Fireball knockback is the final velocity applied to living entities within 4.5 blocks; values are velocity units.
+special-items:
+  fireball:
+    knockback:
+      horizontal: 3.5
+      vertical: 4.5
+
+# Dialogs are the native, server-sent Minecraft GUI available in Java 1.21.6+.
+# A fully transparent custom background is not supported by the vanilla Dialog API.
+
+# The /vsetlobby command saves lobby-spawn.* here. Until it is set,
+# players return to their pre-match location / world spawn fallback.
+
+# Configurable messages sent when the match is found.
+# Placeholders: %map%, %opponent%, %opponent_rank% (also %rank% / %their_rank%),
+# %opponent_ping% (also %their_ping%), %kit%, %player_name%, %player_rank%, %player_ping%.
+# Set enabled to false to hide these messages. Each list entry is one chat line; "" adds a blank line.
+match-statics:
+  enabled: true
+  lines:
+  - '&6Match Statics:'
+  - ''
+  - '&6Map: &f%map%'
+  - '&6Opponent: &f%opponent%'
+  - '&6Rank: &f%opponent_rank%'
+  - '&6Their Ping: &f%opponent_ping%ms'
+
+# Configurable post-match report messages. %winner% and %loser% remain clickable
+# so participants can open the saved match-inventory report. Set enabled to false to hide them.
+match-info:
+  enabled: true
+  lines:
+  - '&6Match Info:'
+  - '&fWinner: %winner%'
+  - '&fLoser: %loser%'
+  - '&8————————'
+
+# Fully configurable FastBoard sidebar layouts.
+# Edit the title and lines below without changing Java files. Lines are shown from top to bottom.
+# Use & color codes, blank entries (""), built-in placeholders, NexPractice placeholders, and PlaceholderAPI.
+# Quick placeholders: %player_name%, %player_ping%, %server_online%, %vprac_status%, %vprac_kit%,
+# %vprac_opponent%, %vprac_match_time%, %vprac_match_kills%, %vprac_round_score%, %vprac_opponent_round_score%, %vprac_wins%, %vprac_losses%, %vprac_kdr%.
+# Full reference: NexPractice-Server/SCOREBOARD_PLACEHOLDERS.md in the source ZIP.
+# Minecraft sidebar scoreboards support up to 15 lines per layout.
+# /vscoreboard reload applies config changes without restarting the server.
+scoreboard:
+  enabled: true
+  # How often to refresh placeholder values. 20 ticks = 1 second. Allowed range: 1-1200 ticks.
+  update-interval-ticks: 20
+
+  lobby:
+    enabled: true
+    title: '&6Your Server'
+    lines:
+    - '&7&l⌚ &7%vprac_date%'
+    - ''
+    - '&b⚔ &fFighting: &6%vprac_fighting%'
+    - '&a⌛ &fQueueing: &6%vprac_queueing%'
+    - ''
+    - ''
+    - '&fOnline:'
+    - '&6%server_online%'
+    - ''
+    - '&7&oServer.ip'
+
+  match:
+    enabled: true
+    title: '&6Your Server'
+    lines:
+    - '&cFight'
+    - ''
+    - '🛈 &fScore: &c%vprac_round_score%&7 - &c%vprac_opponent_round_score%'
+    - ''
+    - '&fOpponent: &b%vprac_opponent%'
+    - '&fYour Ping: %player_ping_color%%player_ping%ms'
+    - '&fTheir Ping: %vprac_opponent_ping%'
+    - ''
+    - '&7&oServer.ip'
+
+  # Used automatically for solo queue matches whose kit requires multiple round wins.
+  # Direct duels, tournament bouts, Bedfight and party matches keep their existing layouts.
+  match-multiround:
+    enabled: true
+    title: '&6Your Server'
+    lines:
+    - ''
+    - '&fOpponent: &b%vprac_opponent%'
+    - ''
+    - '&fⓘ Score: &b%vprac_round_score% &8- &c%vprac_opponent_round_score%'
+    - ''
+    - '&fYour Ping: %player_ping_color%%player_ping%ms'
+    - '&fTheir Ping: %vprac_opponent_ping%'
+    - ''
+    - '&7&oServer.ip'
+
+  # Dedicated sidebar shown only during Party FFA fights. Counts update throughout the match.
+  party-ffa:
+    enabled: true
+    title: '&6Your Server'
+    lines:
+    - ''
+    - '&eKills: &6%vprac_match_kills%'
+    - ''
+    - '&ePlayers: &e%vprac_party_players_alive%/%vprac_party_players_total%'
+    - ''
+    - '&7Your Ping: %player_ping_color%%player_ping%ms'
+    - ''
+    - '&7&oServer.ip'
+
+  # Dedicated sidebar shown only during Party Split fights.
+  party-split:
+    enabled: true
+    title: '&6Your Server'
+    lines:
+    - ''
+    - '&7&lYour Team'
+    - '&9%vprac_party_team_alive%/%vprac_party_team_total%'
+    - ''
+    - '&7&lTheir Team'
+    - '&c%vprac_party_enemy_alive%/%vprac_party_enemy_total%'
+    - ''
+    - '&7Your Ping: %player_ping_color%%player_ping%ms'
+    - ''
+    - '&7&oServer.ip'
+
+  # Dedicated sidebar for Party Split matches on Bedfight-enabled arenas.
+  # Minecraft sidebars support at most 15 lines, so this layout condenses the extra blank separators.
+  party-split-bedfight:
+    enabled: true
+    title: '&6Your Server'
+    lines:
+    - '&cBed Fight &7(Party Split)'
+    - ''
+    - '&f&lBeds'
+    - '&f Your Team: %vprac_bed_self_color%%vprac_bed_self_mark%'
+    - '&f Enemy Team: %vprac_bed_opponent_color%%vprac_bed_opponent_mark%'
+    - ''
+    - '&7&lYour Team'
+    - '&9%vprac_party_team_alive%/%vprac_party_team_total%'
+    - '&7&lTheir Team'
+    - '&c%vprac_party_enemy_alive%/%vprac_party_enemy_total%'
+    - ''
+    - '&f&lKills: &c%vprac_match_kills%'
+    - '&fYour Ping: %player_ping_color%%player_ping%ms'
+    - ''
+    - '&7&oServer.ip'
+
+  # Dedicated sidebar for queue matches whose selected arena has Bedfight enabled.
+  # %vprac_bed_self_color% and %vprac_bed_opponent_color% follow each side's team color.
+  # The corresponding *_mark placeholder is ✔ while that bed can still respawn its owner, otherwise ✘.
+  bedfight:
+    enabled: true
+    title: '&6Your Server'
+    lines:
+    - ''
+    - '&cFight'
+    - ''
+    - '&fOpponent: &b%vprac_opponent%'
+    - ''
+    - '&f&lBeds'
+    - '&f You: %vprac_bed_self_color%%vprac_bed_self_mark%'
+    - '&f Them: %vprac_bed_opponent_color%%vprac_bed_opponent_mark%'
+    - ''
+    - '&fYour Ping: %player_ping_color%%player_ping%ms'
+    - '&fTheir Ping: %vprac_opponent_ping%'
+    - ''
+    - '&f&lKills: &c%vprac_match_kills%'
+    - ''
+    - '&7&oServer.ip'
+
+  # Ping placeholder colors used by %player_ping_color% and related match lines.
+  ping-colors:
+    green-below-ms: 60
+    yellow-below-ms: 120
+    good: '&a'
+    medium: '&e'
+    high: '&c'
+# Cosmetic options and behavior are editable here. Changes apply after /vscoreboard reload.
+# Player selections are stored separately in plugins/NexPractice/cosmetics.yml.
+# Per-kit gameplay rule toggles, including unlimited-hunger, are stored in plugins/NexPractice/kit-rules.yml.
+# When unlimited-hunger is false, vanilla hunger runs on Easy/Normal/Hard and drains through exhaustion (sprinting, jumping, combat movement), not while idle. Peaceful worlds disable vanilla hunger drain, so NexPractice uses an exhaustion fallback for normal-hunger kits without changing the world difficulty.
+# Set enabled: false to hide an option. Use valid Bukkit Material, Particle, trim pattern and trim material names.
+# Trail options: particle is the Bukkit Particle enum; particles-per-step controls density along each projectile step;
+# offset-x/y/z controls spread, extra controls particle-specific speed/extra data, interval-ticks is the update frequency,
+# and max-lifetime-ticks limits how long a trail can stay alive. Higher counts/density and shorter intervals cost more.
+# Kill effects: particle is the main Bukkit Particle; particle-count is burst size; offset-x/y/z controls spread;
+# extra is particle-specific speed/extra data. secondary-particle adds a second burst (blank disables it) with its own count/spread/extra.
+# Kill messages: name and description control the menu item; template is the actual broadcast and uses {killer}/{victim}.
+# Armor trims: pattern selects the trim shape; trim-material selects its accent material on all 4 armor pieces.
+# Valid vanilla trim-material values on Paper 1.21.11: AMETHYST, COPPER, DIAMOND, EMERALD, GOLD, IRON, LAPIS,
+# NETHERITE, QUARTZ, REDSTONE, RESIN. Valid pattern keys are the pattern names used by the entries below.
+# For all cosmetics, enabled hides/shows the option; name, description, and icon control its menu entry.
+cosmetics:
+  # Category labels and descriptions displayed in the Cosmetics menu.
+  categories:
+    projectile-trails:
+      title: '&8Projectile Trails'
+      name: '&eProjectile Trails'
+      description: '&7Particle effects that follow projectiles that you throw.'
+      icon: BOW
+    kill-messages:
+      title: '&8Kill Messages'
+      name: '&eKill Messages'
+      description: '&7Make every kill message your own.'
+      icon: ANVIL
+    kill-effects:
+      title: '&8Kill Effects'
+      name: '&eKill Effects'
+      description: '&7Particle effects that play when you kill other players.'
+      icon: DIAMOND_SWORD
+    armor-trims:
+      title: '&8Armor Trims'
+      name: '&eArmor Trims'
+      description: '&7Show off your armor with fresh and stylish trims.'
+      icon: DIAMOND_CHESTPLATE
+  # Projectile trails: edit the particle or timing/count values to change how each trail behaves.
+  projectile-trails:
+    flame:
+      enabled: true
+      name: Flame Trail
+      description: '&7Leaves a bright flame trail behind arrows and thrown projectiles.'
+      icon: BLAZE_POWDER
+      particle: FLAME
+      particles-per-step: 2
+      offset-x: 0.025
+      offset-y: 0.025
+      offset-z: 0.025
+      extra: 0.005
+      interval-ticks: 2
+      max-lifetime-ticks: 200
+      price: 150
+    end_rod:
+      enabled: true
+      name: End Rod Trail
+      description: '&7Adds clean white sparks along your projectile path.'
+      icon: END_ROD
+      particle: END_ROD
+      particles-per-step: 2
+      offset-x: 0.025
+      offset-y: 0.025
+      offset-z: 0.025
+      extra: 0.005
+      interval-ticks: 2
+      max-lifetime-ticks: 200
+      price: 175
+    heart:
+      enabled: true
+      name: Heart Trail
+      description: '&7Send hearts drifting behind each projectile you launch.'
+      icon: POPPY
+      particle: HEART
+      particles-per-step: 1
+      offset-x: 0.05
+      offset-y: 0.05
+      offset-z: 0.05
+      extra: 0.0
+      interval-ticks: 3
+      max-lifetime-ticks: 180
+      price: 200
+    critical:
+      enabled: true
+      name: Critical Trail
+      description: '&7Marks your shots with sharp critical-hit particles.'
+      icon: IRON_SWORD
+      particle: CRIT
+      particles-per-step: 3
+      offset-x: 0.025
+      offset-y: 0.025
+      offset-z: 0.025
+      extra: 0.01
+      interval-ticks: 2
+      max-lifetime-ticks: 200
+      price: 225
+    enchant:
+      enabled: true
+      name: Enchantment Trail
+      description: '&7Surrounds moving projectiles with enchanting purple particles.'
+      icon: ENCHANTED_BOOK
+      particle: ENCHANT
+      particles-per-step: 4
+      offset-x: 0.15
+      offset-y: 0.15
+      offset-z: 0.15
+      extra: 0.0
+      interval-ticks: 2
+      max-lifetime-ticks: 200
+      price: 250
+    soul_fire:
+      enabled: true
+      name: Soul Fire Trail
+      description: '&7Leaves a cool blue soul-fire trail in the air.'
+      icon: SOUL_LANTERN
+      particle: SOUL_FIRE_FLAME
+      particles-per-step: 2
+      offset-x: 0.025
+      offset-y: 0.025
+      offset-z: 0.025
+      extra: 0.005
+      interval-ticks: 2
+      max-lifetime-ticks: 200
+      price: 275
+    cloud:
+      enabled: true
+      name: Cloud Trail
+      description: '&7Creates a soft cloud trail behind your projectiles.'
+      icon: WHITE_WOOL
+      particle: CLOUD
+      particles-per-step: 2
+      offset-x: 0.04
+      offset-y: 0.04
+      offset-z: 0.04
+      extra: 0.005
+      interval-ticks: 2
+      max-lifetime-ticks: 180
+      price: 300
+    dragon:
+      enabled: true
+      name: Dragon Breath Trail
+      description: '&7Leaves a mysterious dragon-breath trail behind each shot.'
+      icon: DRAGON_BREATH
+      particle: DRAGON_BREATH
+      particles-per-step: 2
+      offset-x: 0.025
+      offset-y: 0.025
+      offset-z: 0.025
+      extra: 0.005
+      interval-ticks: 2
+      max-lifetime-ticks: 160
+      price: 325
+    totem:
+      enabled: true
+      name: Totem Trail
+      description: '&7Adds totem particles as your projectiles travel.'
+      icon: TOTEM_OF_UNDYING
+      particle: TOTEM_OF_UNDYING
+      particles-per-step: 2
+      offset-x: 0.025
+      offset-y: 0.025
+      offset-z: 0.025
+      extra: 0.005
+      interval-ticks: 2
+      max-lifetime-ticks: 180
+      price: 350
+    portal:
+      enabled: true
+      name: Portal Trail
+      description: '&7Distorts the air with portal particles along your projectile path.'
+      icon: ENDER_PEARL
+      particle: PORTAL
+      particles-per-step: 3
+      offset-x: 0.1
+      offset-y: 0.1
+      offset-z: 0.1
+      extra: 0.0
+      interval-ticks: 2
+      max-lifetime-ticks: 200
+  # Kill-message templates: use {killer} and {victim} as replacement tokens.
+      price: 250
+  kill-messages:
+    classic:
+      enabled: true
+      name: Classic
+      description: '&7A clean, classic message for every confirmed match kill.'
+      icon: PAPER
+      template: '&c{victim} &7was slain by &6{killer}&7.'
+      price: 150
+    outplayed:
+      enabled: true
+      name: Outplayed
+      description: '&7Announce that you outplayed your opponent.'
+      icon: FEATHER
+      template: '&6{killer} &7outplayed &c{victim}&7.'
+      price: 175
+    comboed:
+      enabled: true
+      name: Comboed
+      description: '&7Show that your opponent was caught in your combo.'
+      icon: IRON_SWORD
+      template: '&c{victim} &7got comboed by &6{killer}&7.'
+      price: 200
+    sent_home:
+      enabled: true
+      name: Sent Home
+      description: '&7Tell everyone your opponent was sent back to spawn.'
+      icon: ENDER_PEARL
+      template: '&c{victim} &7was sent back to spawn by &6{killer}&7.'
+      price: 225
+    owned:
+      enabled: true
+      name: Owned
+      description: '&7A bold message for a decisive win over your opponent.'
+      icon: GOLD_INGOT
+      template: '&6{killer} &7owned &c{victim}&7.'
+      price: 250
+    clipped:
+      enabled: true
+      name: Clipped
+      description: '&7A sharp message for a perfectly timed elimination.'
+      icon: SHEARS
+      template: '&c{victim} &7got clipped by &6{killer}&7.'
+      price: 275
+    no_chance:
+      enabled: true
+      name: No Chance
+      description: '&7Let everyone know your opponent never stood a chance.'
+      icon: SHIELD
+      template: '&c{victim} &7had no chance against &6{killer}&7.'
+      price: 300
+    dominated:
+      enabled: true
+      name: Dominated
+      description: '&7Declare your dominance after winning a fight.'
+      icon: GOLDEN_SWORD
+      template: '&6{killer} &7dominated &c{victim}&7.'
+      price: 325
+    one_tap:
+      enabled: true
+      name: One-Tapped
+      description: '&7A quick message for a clean one-tap finish.'
+      icon: ARROW
+      template: '&c{victim} &7was one-tapped by &6{killer}&7.'
+      price: 350
+    knocked_out:
+      enabled: true
+      name: Knocked Out
+      description: '&7Call out the knockout after a successful elimination.'
+      icon: IRON_AXE
+      template: '&c{victim} &7was knocked out by &6{killer}&7.'
+  # Kill effects: edit particles/count/offsets; an optional secondary particle adds another layer.
+      price: 250
+  kill-effects:
+    fire_burst:
+      enabled: true
+      name: Fire Burst
+      description: '&7Explodes in a burst of fiery particles when you get a match kill.'
+      icon: FIRE_CHARGE
+      particle: FLAME
+      particle-count: 28
+      offset-x: 0.55
+      offset-y: 0.65
+      offset-z: 0.55
+      extra: 0.08
+      secondary-particle: ''
+      secondary-count: 0
+      price: 150
+    heart_burst:
+      enabled: true
+      name: Heart Burst
+      description: '&7Releases a burst of hearts at your defeated opponent.'
+      icon: POPPY
+      particle: HEART
+      particle-count: 28
+      offset-x: 0.55
+      offset-y: 0.65
+      offset-z: 0.55
+      extra: 0.08
+      secondary-particle: HAPPY_VILLAGER
+      secondary-count: 8
+      secondary-offset-x: 0.35
+      secondary-offset-y: 0.4
+      secondary-offset-z: 0.35
+      secondary-extra: 0.0
+      price: 175
+    spark_burst:
+      enabled: true
+      name: Spark Burst
+      description: '&7Creates a bright electrical spark burst after a kill.'
+      icon: LIGHTNING_ROD
+      particle: ELECTRIC_SPARK
+      particle-count: 28
+      offset-x: 0.55
+      offset-y: 0.65
+      offset-z: 0.55
+      extra: 0.08
+      secondary-particle: ''
+      secondary-count: 0
+      price: 200
+    soul_release:
+      enabled: true
+      name: Soul Release
+      description: '&7Releases cool soul particles where your opponent falls.'
+      icon: SOUL_LANTERN
+      particle: SOUL
+      particle-count: 28
+      offset-x: 0.55
+      offset-y: 0.65
+      offset-z: 0.55
+      extra: 0.08
+      secondary-particle: ''
+      secondary-count: 0
+      price: 225
+    ender_pop:
+      enabled: true
+      name: Ender Pop
+      description: '&7Leaves a brief portal-like burst after each elimination.'
+      icon: ENDER_PEARL
+      particle: PORTAL
+      particle-count: 28
+      offset-x: 0.55
+      offset-y: 0.65
+      offset-z: 0.55
+      extra: 0.08
+      secondary-particle: ''
+      secondary-count: 0
+      price: 250
+    totem_burst:
+      enabled: true
+      name: Totem Burst
+      description: '&7Triggers a totem-themed particle burst on a confirmed kill.'
+      icon: TOTEM_OF_UNDYING
+      particle: TOTEM_OF_UNDYING
+      particle-count: 28
+      offset-x: 0.55
+      offset-y: 0.65
+      offset-z: 0.55
+      extra: 0.08
+      secondary-particle: ''
+      secondary-count: 0
+      price: 275
+    critical_burst:
+      enabled: true
+      name: Critical Burst
+      description: '&7Creates a sharp burst of critical-hit particles.'
+      icon: IRON_SWORD
+      particle: CRIT
+      particle-count: 28
+      offset-x: 0.55
+      offset-y: 0.65
+      offset-z: 0.55
+      extra: 0.08
+      secondary-particle: ''
+      secondary-count: 0
+      price: 300
+    dragon_cloud:
+      enabled: true
+      name: Dragon Cloud
+      description: '&7Releases a cloud of dragon breath at the elimination spot.'
+      icon: DRAGON_BREATH
+      particle: DRAGON_BREATH
+      particle-count: 28
+      offset-x: 0.55
+      offset-y: 0.65
+      offset-z: 0.55
+      extra: 0.08
+      secondary-particle: ''
+      secondary-count: 0
+      price: 325
+    enchant_burst:
+      enabled: true
+      name: Enchantment Burst
+      description: '&7Surrounds the elimination with enchanting particles.'
+      icon: ENCHANTED_BOOK
+      particle: ENCHANT
+      particle-count: 28
+      offset-x: 0.55
+      offset-y: 0.65
+      offset-z: 0.55
+      extra: 0.08
+      secondary-particle: ''
+      secondary-count: 0
+      price: 350
+    cloud_puff:
+      enabled: true
+      name: Cloud Puff
+      description: '&7Creates a soft cloud puff when you defeat an opponent.'
+      icon: WHITE_WOOL
+      particle: CLOUD
+      particle-count: 28
+      offset-x: 0.55
+      offset-y: 0.65
+      offset-z: 0.55
+      extra: 0.08
+      secondary-particle: ''
+      secondary-count: 0
+  # Armor trims: change pattern and trim-material to change the appearance applied to all armor.
+      price: 250
+  armor-trims:
+    sentry:
+      enabled: true
+      name: Sentry
+      description: '&7A bold, clean trim inspired by a sentry’s armor.'
+      icon: SENTRY_ARMOR_TRIM_SMITHING_TEMPLATE
+      pattern: sentry
+      trim-material: DIAMOND
+      price: 150
+    dune:
+      enabled: true
+      name: Dune
+      description: '&7A geometric trim with a desert-inspired look.'
+      icon: DUNE_ARMOR_TRIM_SMITHING_TEMPLATE
+      pattern: dune
+      trim-material: DIAMOND
+      price: 175
+    coast:
+      enabled: true
+      name: Coast
+      description: '&7A flowing trim with a coastal, wave-like pattern.'
+      icon: COAST_ARMOR_TRIM_SMITHING_TEMPLATE
+      pattern: coast
+      trim-material: DIAMOND
+      price: 200
+    wild:
+      enabled: true
+      name: Wild
+      description: '&7A rugged trim that gives armor a wild appearance.'
+      icon: WILD_ARMOR_TRIM_SMITHING_TEMPLATE
+      pattern: wild
+      trim-material: DIAMOND
+      price: 225
+    ward:
+      enabled: true
+      name: Ward
+      description: '&7An ornate trim with a guarded, ancient look.'
+      icon: WARD_ARMOR_TRIM_SMITHING_TEMPLATE
+      pattern: ward
+      trim-material: DIAMOND
+      price: 250
+    eye:
+      enabled: true
+      name: Eye
+      description: '&7A striking eye-shaped design for your armor.'
+      icon: EYE_ARMOR_TRIM_SMITHING_TEMPLATE
+      pattern: eye
+      trim-material: DIAMOND
+      price: 275
+    vex:
+      enabled: true
+      name: Vex
+      description: '&7A sharp, mischievous trim with a vex-inspired style.'
+      icon: VEX_ARMOR_TRIM_SMITHING_TEMPLATE
+      pattern: vex
+      trim-material: DIAMOND
+      price: 300
+    tide:
+      enabled: true
+      name: Tide
+      description: '&7A flowing oceanic pattern for every armor piece.'
+      icon: TIDE_ARMOR_TRIM_SMITHING_TEMPLATE
+      pattern: tide
+      trim-material: DIAMOND
+      price: 325
+    snout:
+      enabled: true
+      name: Snout
+      description: '&7A distinctive piglin-inspired trim pattern.'
+      icon: SNOUT_ARMOR_TRIM_SMITHING_TEMPLATE
+      pattern: snout
+      trim-material: DIAMOND
+      price: 350
+    rib:
+      enabled: true
+      name: Rib
+      description: '&7A skeletal rib pattern that stands out in combat.'
+      icon: RIB_ARMOR_TRIM_SMITHING_TEMPLATE
+      pattern: rib
+      trim-material: DIAMOND
+      price: 250
+    spire:
+      enabled: true
+      name: Spire
+      description: '&7A tall, angular trim inspired by End cities.'
+      icon: SPIRE_ARMOR_TRIM_SMITHING_TEMPLATE
+      pattern: spire
+      trim-material: DIAMOND
+      price: 150
+    silence:
+      enabled: true
+      name: Silence
+      description: '&7A rare-looking trim with a detailed dark pattern.'
+      icon: SILENCE_ARMOR_TRIM_SMITHING_TEMPLATE
+      pattern: silence
+      trim-material: DIAMOND
+      price: 175
+    wayfinder:
+      enabled: true
+      name: Wayfinder
+      description: '&7A travel-inspired pattern for explorers and fighters.'
+      icon: WAYFINDER_ARMOR_TRIM_SMITHING_TEMPLATE
+      pattern: wayfinder
+      trim-material: DIAMOND
+      price: 200
+    shaper:
+      enabled: true
+      name: Shaper
+      description: '&7A crafted geometric trim with a balanced design.'
+      icon: SHAPER_ARMOR_TRIM_SMITHING_TEMPLATE
+      pattern: shaper
+      trim-material: DIAMOND
+      price: 225
+    host:
+      enabled: true
+      name: Host
+      description: '&7A patterned trim inspired by the Host armor design.'
+      icon: HOST_ARMOR_TRIM_SMITHING_TEMPLATE
+      pattern: host
+      trim-material: DIAMOND
+      price: 250
+    raiser:
+      enabled: true
+      name: Raiser
+      description: '&7A stepped trim pattern with a strong silhouette.'
+      icon: RAISER_ARMOR_TRIM_SMITHING_TEMPLATE
+      pattern: raiser
+      trim-material: DIAMOND
+      price: 275
+    flow:
+      enabled: true
+      name: Flow
+      description: '&7A flowing, modern pattern across all four armor pieces.'
+      icon: FLOW_ARMOR_TRIM_SMITHING_TEMPLATE
+      pattern: flow
+      trim-material: DIAMOND
+      price: 300
+    bolt:
+      enabled: true
+      name: Bolt
+      description: '&7A crisp, angular trim inspired by lightning and bolts.'
+      icon: BOLT_ARMOR_TRIM_SMITHING_TEMPLATE
+      pattern: bolt
+      trim-material: DIAMOND
+      price: 325
+cosmetics-config-version: 2
+tournaments:
+  host-permission: vprac.tournament.host
+  host-cooldown-seconds: 1800
+  required-rank: Your Rank
+  winner-coins: 100
+  host-item:
+    name: '&6Host a Tournament'
+    lore:
+    - '&7Require {required_rank} &7to host a tournament.!'
+  messages:
+    unable-state: '&6unable to execute this in ur current state'
+    party-member-registered: '&cA party member is registered in a tournament.'
+    spectate-until-match-end: "&6You must spectate until your teammate's tournament match ends."
+    no-host-permission: '&cYou need the required rank to host a tournament.'
+    host-cooldown: '&cYou can host another tournament in {minutes}m {seconds}s.'
+    active-exists: '&cA tournament is already active. Wait until it finishes before hosting another.'
+    kit-missing: '&cThat kit no longer exists.'
+    teammate-not-2v2: '&cTeammate selection is only available in a 2v2 tournament.'
+    teammates-locked: '&cTeammates are locked after tournament registration closes.'
+    invite-cooldown: '&cYou can invite another teammate in {seconds} seconds.'
+    invite-unavailable: '&cThat player is no longer available.'
+    already-has-teammate: '&cYou or that player already has a teammate.'
+    pending-invite: '&cThat player already has a pending teammate invitation.'
+    teammate-invite: '&a{inviter} &7Want you to become his teammate! '
+    invite-sent: '&aTeammate invitation sent to {target}.'
+    invite-expired: '&cThat teammate invitation has expired.'
+    invite-unavailable-now: '&cThat tournament or invitation is no longer available.'
+    teammate-confirm-inviter: '&a{target} is now your teammate.'
+    teammate-confirm-target: '&aYou are now teammates with {inviter}.'
+    invite-no-longer-available: '&cThat teammate invitation is no longer available.'
+    invite-declined-inviter: '&c{target} declined your teammate invitation.'
+    invite-declined-target: '&eYou declined the teammate invitation.'
+    no-longer-teammates: '&cYou no longer have that teammate.'
+    left-teammate: '&eYou left your teammate.'
+    teammate-left: '&e{player} left your team.'
+    not-accepting: '&cThat tournament is no longer accepting players.'
+    already-joined: '&cYou have already joined this tournament.'
+    unpaired-2v2: '&cYou were not paired with a teammate, so you cannot enter this 2v2 tournament.'
+    not-enough-players-1v1: '&cNot enough players joined; at least two are required.'
+    not-enough-players-2v2: '&cNot enough complete teams joined; at least two teams are required.'
+    not-in-tournament: '&cYou are not in a tournament.'
+    team-left: '&cYour team left the tournament because your teammate left.'
+    team-disconnected: '&cYour team will forfeit this tournament match because your teammate disconnected.'
+    usage: '&cUsage: /vtournament <join|leave|accept|deny|cancel>'
+    cancel-no-permission: '&cYou do not have permission to cancel a tournament.'
+    no-active-tournament: '&cThere is no active tournament.'
+    cancel-registration-only: '&cA tournament can only be cancelled during registration.'
+    players-only: '&cOnly players can use this command.'
+    invalid-tournament-link: '&cThat tournament link is invalid.'
+    invite-usage: '&cUsage: /vtournament {action} <invite-id>'
+    invalid-invite-link: '&cThat invitation link is invalid.'
+    cancelled: '&cTournament cancelled: &7{reason}'
+    already-running: '&cA tournament is already active. Wait until it finishes before hosting another.'
+    not-enough-players-generic: '&cNo eligible players remain in the bracket.'
+    cancel-kit-removed: 'The selected kit no longer exists.'
+    cancel-no-eligible-players: 'No eligible players remain in the bracket.'
+    cancel-waiting-without-opponent: 'The waiting entrant had no eligible opponent; no winner was awarded.'
+    cancel-no-winner: 'The bracket ended without a winner.'
+    cancelled-by-admin: 'Cancelled by an administrator.'
+    cannot-leave-active-match: '&6unable to execute this in ur current state'
+    host-cooldown-format: '&cYou can host another tournament in {minutes}m {seconds}s.'
+    reward-received: '&aRecived {amount}⛃ for winning on tournament'
+    joined: '&9{player} &6Joined the tournament!'
+    left: '&9{player} &6Left the tournament!'
+  ui:
+    choose-kit: '&7Choose the kit for your tournament. Click a kit name.'
+    choose-kit-hover: '&7Choose {kit}'
+    host-title: 'Host a Tournament'
+    choose-format: '&7Select a single-elimination format for {kit}.'
+    host-1v1: '&6Host a 1v1 {kit} Tournament'
+    host-1v1-hover: '&7Players compete individually'
+    host-2v2: '&6Host a 2v2 {kit} Tournament'
+    host-2v2-hover: '&7Players compete in teams of two'
+    host-kit-title: 'Host {kit} Tournament'
+    join-hover: '&eJoin the {format} tournament'
+    teammate-selector-title: '&8Select a Teammate &7({page}/{pages})'
+    teammate-selector-glass-name: '&7 '
+    teammate-selector-player-name: '&f{player}'
+    invite-sent-lore: '&aInvite Sent!'
+    invite-player-lore: '&aClick to invite {player}'
+    no-players-name: '&cNo available players'
+    no-players-lore: '&7Wait for other players to join.'
+    previous-page-name: '&ePrevious Page'
+    previous-page-lore: '&7Go to page {page}.'
+    next-page-name: '&eNext Page'
+    next-page-lore: '&7Go to page {page}.'
+    teammate-settings-title: '&8Teammate Settings'
+    leave-teammate-name: '&4Leave teammate!'
+    leave-teammate-lore: '&7Stop being teammates with {player}.'
+    invite-accept-text: '&a[ACCEPT]'
+    invite-accept-hover: '&aAccept teammate invitation'
+    invite-deny-text: '&c[DENY]'
+    invite-deny-hover: '&cDecline teammate invitation'
+    close-button: 'Close'
+  items:
+    leave-name: '&cLeave tournament&7(Right click)'
+    leave-lore: '&7Right-click to leave the tournament.'
+    teammate-name: '&6Teammate&7(Right Click)'
+    teammate-named: '&6{player}&7(Right Click)'
+    teammate-unpaired-lore: '&7Choose a tournament teammate.'
+    teammate-paired-lore: '&7Manage your teammate.'
+  broadcasts:
+    join-separator: '&7━━━━━━━━━━━━━━━━━━━━'
+    join-title: '&6{format} Tournament'
+    join-kit: '&6Kit: &d{kit}'
+    join-starting: '&eStarting in &6{left_seconds} &eseconds!'
+    join-click: '&a(Click here to join!)'
+    quarter-finals: '&9{kit} Tournament quarter finals has started!'
+    semi-finals: '&9{kit} Tournament Semi-Finals has started!'
+    finals: '&9{kit} Finals has started!'
+    final-matchup: '&7{team_a} &8vs &7{team_b} &a(Click to spectate!)'
+    final-hover: '&aSpectate the final'
+    winner-separator: '&7━━━━━━━━━━━━━━━━━━━━'
+    winner-title: '&6Tournament'
+    winner-line: '&7{winners} &6Won the Tournament!'
+    tournament-cancelled: '&cTournament cancelled: &7{reason}'
+# Party menu settings, party chat and announcement rank requirements.
+party:
+  announce-required-rank: Your Rank
+  announce-hover: '&fRequire {required_rank} to announce party!'
+  messages:
+    not-in-party: '&cYou are not in a party'
+    chat-format: '&8[&cParty&8]&c{player} &8» &f{message}'
+    party-full: '&cYour party is full ({max_members} members maximum).'
+    max-members-updated: '&aParty max players set to {max_members}.'
+
+
+# Lobby flight preferences. Permission and rank tooltip are checked server-side.
+settings:
+  fly-required-rank: Your Rank
+  fly-hover: '&fEnable or disable flying in lobby'
+  fly-hover-no-permission: '&fEnable or disable flying in lobby (require {required_rank})'
+  fly-label: '&bFly&7: {status}'
+  fly-enabled: '&aON'
+  fly-disabled: '&cOFF'

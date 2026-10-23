@@ -1,0 +1,142 @@
+name: NexPractice
+version: ${version}
+main: com.vprac.VpracPlugin
+# Minimum supported API version; newer Paper versions up to 26.3 are also supported.
+api-version: '1.21.11'
+author: NexPractice
+description: Paper 1.21.11–26.3 practice core with queues, duels, tournaments, party fights, statistics, and optional FancyHolograms leaderboards.
+depend: [packetevents, PlaceholderAPI, FastAsyncWorldEdit]
+softdepend: [FancyHolograms]
+commands:
+  vkitaddingmode:
+    description: Clear inventory and enter kit creation mode.
+    usage: /vkitaddingmode
+    permission: vprac.admin.kits
+  vaddkit:
+    description: Save the kit currently prepared in kit creation mode with its queue icon.
+    usage: /vaddkit <name> <icon>
+    permission: vprac.admin.kits
+  varena:
+    description: Create and manage NexPractice arenas, including queue-only Bedfight setup.
+    usage: /varena <create|setspawn|enable|disable|list|partyffa|bedsetup|bedsetvoid|enablebedfight> [arguments]
+    permission: vprac.admin.arena
+  vgive:
+    description: Give a NexPractice special item to a player.
+    usage: /vgive <player> <fireball|goldenhead> <amount>
+    permission: vprac.admin.give
+  vaddcoins:
+    description: Add coins to an online or previously seen player.
+    usage: /vaddcoins <name> <amount>
+    permission: vprac.admin.coins
+  varenamenu:
+    description: Open the arena copies, rename, delete, and kit-compatibility manager.
+    usage: /varenamenu
+    permission: vprac.admin.arenamenu
+  vsetarenaborder:
+    description: Select and snapshot an arena cuboid using the NexPractice selection axe.
+    usage: /vsetarenaborder <start [arena]|done>
+    permission: vprac.admin.arena
+  vsetlobby:
+    description: Set the practice lobby spawn to your current location.
+    usage: /vsetlobby
+    permission: vprac.admin.lobby
+  vkitsettings:
+    description: Open the administrator kit rule settings menu.
+    usage: /vkitsettings [kit]
+    permission: vprac.admin.kits
+  vparty:
+    description: Manage party invitations and party membership.
+    usage: /vparty <menu|accept|decline|leave|join <party-id>>
+  party:
+    description: Manage party invites, chat, members and leadership.
+    usage: /party <invite <name>|chat <msg>|kick <name>|transfer <name>|disband|leave>
+  vhg:
+    description: Create and manage NexPractice FancyHolograms leaderboards.
+    usage: /vhg <create leaderboards <wins|kills|kdr|rank>|list|delete leaderboards <id>|reload>
+  msg:
+    description: Send a private message to an online player.
+    usage: /msg <name> <msg>
+  r:
+    description: Reply to the last player who sent you a private message.
+    usage: /r <reply>
+  pc:
+    description: Send a message to your party. Use @ <msg> as a chat shortcut.
+    usage: /pc <msg>
+    aliases: [p]
+  duel:
+    description: Open the duel kit selector or accept/deny a duel request from chat.
+    usage: /duel <player> | /duel <accept|deny> <request-id>
+  spec:
+    description: Spectate a player who is in an active NexPractice match.
+    usage: /spec <player>
+  vmatchview:
+    description: Open a time-limited read-only post-match inventory snapshot.
+    usage: /vmatchview <report-token> <player-uuid>
+  ranks:
+    description: Open the NexPractice rank progression menu.
+    usage: /ranks
+  leave:
+    description: Forfeit your current match or leave your queue/tournament.
+    usage: /leave
+  vscoreboard:
+    description: Reload the configurable NexPractice scoreboard layouts.
+    usage: /vscoreboard reload
+    permission: vprac.admin.scoreboard
+  vtournament:
+    description: Join, leave, or respond to NexPractice tournament teammate invitations.
+    usage: /vtournament <join|leave|accept|deny|cancel>
+    aliases: [tournament]
+permissions:
+  vprac.admin.kits:
+    description: Allows entering kit creation mode and saving kits.
+    default: op
+  vprac.admin.arenamenu:
+    description: Allows opening and managing arena templates and their instances.
+    default: op
+  vprac.admin.arena:
+    description: Allows creating, configuring, enabling, and disabling arenas.
+    default: op
+  vprac.admin.lobby:
+    description: Allows setting the practice lobby spawn.
+    default: op
+  vprac.admin.give:
+    description: Allows giving NexPractice special items.
+    default: op
+  vprac.admin.coins:
+    description: Allows adding coins to player balances.
+    default: op
+  vprac.admin.scoreboard:
+    description: Allows reloading the NexPractice scoreboard configuration.
+    default: op
+  vprac.admin.tournament:
+    description: Allows managing NexPractice tournaments.
+    default: op
+  vprac.admin.holograms:
+    description: Allows creating and managing NexPractice FancyHolograms leaderboards.
+    default: op
+  vprac.tournament.host:
+    description: Allows hosting NexPractice tournaments.
+    default: op
+  vprac.party.max-unlimited:
+    description: Allows setting party capacity to 150 (unlimited) in the party menu.
+    default: false
+  vprac.lobby.fly:
+    description: Allows toggling flight in the lobby through player settings.
+    default: false
+  vprac.party.announce:
+    description: Allows a party leader to announce an open party to the server.
+    default: false
+  vprac.admin.*:
+    description: All NexPractice administrative permissions.
+    default: op
+    children:
+      vprac.admin.kits: true
+      vprac.admin.arena: true
+      vprac.admin.arenamenu: true
+      vprac.admin.scoreboard: true
+      vprac.admin.lobby: true
+      vprac.admin.give: true
+      vprac.admin.coins: true
+      vprac.admin.tournament: true
+      vprac.admin.holograms: true
+      vprac.tournament.host: true

@@ -1,0 +1,23 @@
+# Gradle
+.gradle/
+build/
+**/build/
+
+# Compiled Java files
+out/
+*.class
+*.jar
+
+# IDE files
+.idea/
+*.iml
+.vscode/
+
+# Temporary files and logs
+*.log
+javac.*.args
+
+# Operating system files
+.DS_Store
+Thumbs.db
+Desktop.ini

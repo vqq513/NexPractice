@@ -1,0 +1,68 @@
+plugins {
+    id 'java'
+    id 'com.gradleup.shadow' version '8.3.10'
+}
+
+group = 'com.vprac'
+version = '1.0.0'
+
+description = 'NexPractice Paper 1.21.11–26.3 practice queues, single-elimination tournaments, coins and cosmetics, configurable party capacity, Creative flight, single native-billboard text leaderboard holograms, lobby flight, rank progression, party chat and team management, configurable scoreboards, match reports, spectators, native Dialogs, and FAWE arena instances'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+repositories {
+    mavenCentral()
+    maven { url = 'https://repo.papermc.io/repository/maven-public/' }
+    maven { url = 'https://repo.codemc.io/repository/maven-releases/' }
+    maven { url = 'https://repo.helpch.at/releases/' }
+    maven { url = 'https://maven.enginehub.org/repo/' }
+    maven { url = 'https://repo.fancyinnovations.com/releases' }
+}
+
+dependencies {
+    implementation platform('com.intellectualsites.bom:bom-newest:1.56')
+    implementation 'fr.mrmicky:fastboard:2.2.2'
+    // Optional-by-config player-stat storage backends; bundled so admins do not need separate JDBC/Mongo driver plugins.
+    implementation 'com.mysql:mysql-connector-j:9.7.0'
+    implementation 'org.mongodb:mongodb-driver-sync:5.13.0'
+    // Compile against the lowest supported API so the same Java 21 bytecode can load on later Paper releases.
+    // Keep shared source limited to APIs available on Paper 1.21.11.
+    compileOnly 'io.papermc.paper:paper-api:1.21.11-R0.1-SNAPSHOT'
+    compileOnly 'com.fastasyncworldedit:FastAsyncWorldEdit-Core'
+    compileOnly('com.fastasyncworldedit:FastAsyncWorldEdit-Bukkit') { transitive = false }
+    compileOnly 'com.github.retrooper:packetevents-spigot:2.14.0'
+    compileOnly 'me.clip:placeholderapi:2.12.3'
+    // Optional runtime integration: plugin.yml marks FancyHolograms as softdepend.
+    compileOnly 'de.oliver:FancyHolograms:2.9.1'
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.release = 21
+}
+
+processResources {
+    filteringCharset = 'UTF-8'
+    filesMatching('plugin.yml') {
+        expand(version: project.version)
+    }
+}
+
+
+// Produce a ready-to-install plugin JAR with FastBoard included and relocated.
+tasks.named('jar') {
+    archiveClassifier.set('plain')
+}
+
+tasks.named('shadowJar') {
+    archiveClassifier.set('')
+    relocate 'fr.mrmicky.fastboard', 'com.vprac.libs.fastboard'
+}
+
+tasks.named('build') {
+    dependsOn tasks.named('shadowJar')
+}
